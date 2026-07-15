@@ -258,13 +258,26 @@ async function tryUnlock(password) {
     }
     encCache = window.__ENC;
   }
+  // 暗号解除（この処理がこの環境で固まっていないかを切り分ける）
+  $('lockErr').style.color = 'var(--sub)';
+  $('lockErr').textContent = '暗号を解いています…';
+  let decrypted;
   try {
-    boardData = await decryptBoard(encCache, password);
+    decrypted = await Promise.race([
+      decryptBoard(encCache, password),
+      new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { kind: 'cryptotimeout' })), 8000)),
+    ]);
   } catch (e) {
+    if (e.kind === 'cryptotimeout') {
+      const err = new Error('暗号解除がこの環境で完了しませんでした（ブラウザのセキュリティ設定の可能性）。ブラウザ情報: ' + navigator.userAgent);
+      err.kind = 'cryptotimeout';
+      throw err;
+    }
     const err = new Error('パスワードが違います');
     err.kind = 'pw';
     throw err;
   }
+  boardData = decrypted;
   localStorage.setItem('roompw', password);
   $('lock').hidden = true;
   // りざぶ郎への導線は復号後にだけ現れる
@@ -312,7 +325,7 @@ $('lockGo').addEventListener('click', doUnlock);
 $('lockPw').addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
 // ビルド確認用（キャッシュ判別）
 $('lockErr').textContent = '';
-window.__BUILD = '20260715d';
+window.__BUILD = '20260715e';
 $('buildTag').textContent = 'バージョン ' + window.__BUILD + '（データ読込: ' + (window.__ENC ? 'OK' : (window.__ENC_ERR ? '失敗' : '待機中') ) + '）';
 
 function availableDates() { return Object.keys(boardData.days).sort(); }
