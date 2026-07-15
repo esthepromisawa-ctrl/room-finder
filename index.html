@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会議室 空き状況ファインダー</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --ink: #1f2430; --sub: #667085;
+    --line: #e4e7ec; --accent: #2563eb; --accent-soft: #eff4ff;
+    --free: #e8f7ee; --free-ink: #15803d; --busy: #eef1f5; --busy-ink: #475467;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", sans-serif; background: var(--bg); color: var(--ink); }
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; position: sticky; top: 0; z-index: 20; }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; white-space: nowrap; }
+  .rzb-open { text-decoration: none; font-size: 13px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 12px; background: var(--accent-soft); white-space: nowrap; }
+  .rzb-open:hover { background: #e0eaff; }
+  .rzb-open.vip { color: #92400e; border-color: #d9a441; background: #fdf3e0; }
+  .rzb-open.vip:hover { background: #fae9c8; }
+  #status { font-size: 12px; color: var(--sub); margin-left: auto; }
+
+  .daterow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .datebox { display: flex; align-items: center; gap: 10px; background: var(--accent-soft); border: 1.5px solid var(--accent); border-radius: 12px; padding: 8px 16px; }
+  .datebox input { border: none; background: transparent; font-size: 20px; font-weight: 700; color: var(--ink); padding: 0; cursor: pointer; }
+  .datebox #wday { font-size: 17px; font-weight: 700; color: var(--accent); }
+  .daterow button { padding: 10px 14px; font-size: 15px; }
+
+  button, select, input[type=date], input[type=time], input[type=text] { font: inherit; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; padding: 9px 26px; font-size: 15px; cursor: pointer; }
+  button.primary:hover { background: #1d4fd7; }
+  button.ghost { border: none; background: none; color: var(--accent); font-size: 12px; padding: 2px 6px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 20px 60px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .card h2 { font-size: 13px; margin: 0 0 12px; color: var(--sub); font-weight: 600; letter-spacing: .04em; }
+  .finder { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field > span { font-size: 12px; color: var(--sub); }
+  .range { display: flex; align-items: center; gap: 6px; }
+
+  details.rooms { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  details.rooms summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); user-select: none; }
+  details.rooms summary::-webkit-details-marker { display: none; }
+  details.rooms summary .arrow { transition: transform .15s; font-size: 11px; color: var(--sub); }
+  details.rooms[open] summary .arrow { transform: rotate(90deg); }
+  .sel-count { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .group { margin-top: 12px; }
+  .group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .group-head h3 { font-size: 12.5px; margin: 0; color: var(--sub); font-weight: 700; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); cursor: pointer; user-select: none; color: var(--sub); }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  .grid-wrap { overflow-x: auto; }
+  table.sched { border-collapse: collapse; min-width: 900px; width: 100%; }
+  table.sched th, table.sched td { border: 1px solid var(--line); font-size: 11px; }
+  table.sched th.time { background: var(--card); color: var(--sub); font-weight: 500; padding: 3px 2px; min-width: 34px; }
+  table.sched td.room { background: var(--card); font-size: 12px; font-weight: 600; padding: 6px 8px; white-space: nowrap; position: sticky; left: 0; z-index: 5; border-right: 2px solid var(--line); }
+  table.sched td.slot { height: 34px; padding: 0; background: #fff; min-width: 11px; }
+  table.sched td.slot.hourline { border-left: 1px solid #cfd4dc; }
+  .resv { position: relative; }
+  .resv-label { position: absolute; inset: 2px; overflow: hidden; font-size: 10.5px; line-height: 1.25; border-radius: 4px; padding: 2px 4px; border-left: 3px solid; font-weight: 600; }
+
+  .results { margin-top: 16px; }
+  .results .room-block { padding: 10px 0; border-top: 1px solid var(--line); }
+  .results .room-block:first-of-type { border-top: none; }
+  .results h3 { font-size: 13.5px; margin: 0 0 8px; }
+  .slots { display: flex; flex-wrap: wrap; gap: 6px; }
+  .slotbtn { background: var(--free); color: var(--free-ink); border: 1px solid #b7e2c6; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+  .slotbtn:hover { border-color: var(--free-ink); }
+  .empty { color: var(--sub); font-size: 13px; }
+
+  dialog { border: 1px solid var(--line); border-radius: 14px; padding: 22px; max-width: 430px; }
+  dialog::backdrop { background: rgba(15,23,42,.35); }
+  dialog h3 { margin: 0 0 4px; font-size: 15px; }
+  dialog p { margin: 4px 0 10px; color: var(--sub); font-size: 13px; }
+  .timeedit { margin: 0 0 12px; padding: 10px 12px; background: var(--bg); border-radius: 10px; }
+  .timeedit input[type=time] { font-size: 17px; font-weight: 700; padding: 6px 8px; margin-top: 4px; }
+  .dlgfields { margin-bottom: 10px; }
+  .dlgfields label { font-size: 12px; color: var(--sub); }
+  .dlgfields input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; margin-top: 2px; width: 100%; }
+  .dlgchecks { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 13.5px; }
+  .dlgchecks input { accent-color: var(--accent); transform: scale(1.15); margin-right: 4px; }
+  .dlg-actions { display: flex; flex-direction: column; gap: 8px; }
+  .note { font-size: 11.5px; color: var(--sub); margin-top: 10px; line-height: 1.7; }
+  #dlgWarn { color: #b91c1c; font-size: 12px; margin-top: 4px; }
+
+  /* パスワード画面 */
+  #lock { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .lockcard { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 32px; width: 340px; box-shadow: 0 4px 16px rgba(16,24,40,.08); text-align: center; }
+  .lockcard h2 { font-size: 16px; margin: 0 0 6px; }
+  .lockcard p { font-size: 12.5px; color: var(--sub); margin: 0 0 16px; }
+  .lockcard input { width: 100%; padding: 11px 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; text-align: center; }
+  .lockcard button { width: 100%; margin-top: 10px; }
+  #lockErr { color: #b91c1c; font-size: 12.5px; margin-top: 8px; min-height: 1em; }
+</style>
+</head>
+<body>
+<div id="lock" hidden>
+  <div class="lockcard">
+    <h2>🏢 会議室 空き状況ファインダー</h2>
+    <p>共有パスワードを入力してください</p>
+    <input type="password" id="lockPw" placeholder="パスワード" autocomplete="current-password">
+    <button class="primary" id="lockGo">開く</button>
+    <div id="lockErr"></div>
+  </div>
+</div>
+<header>
+  <h1>🏢 会議室 空き状況ファインダー</h1>
+  <a class="rzb-open" href="https://www.r326.com/b/main.aspx?id=eplb0275" target="_blank" rel="noopener">🔗 りざぶ郎を開く</a>
+  <a class="rzb-open vip" href="https://www.r326.com/b/main.aspx?g=tMdf6LK014fXN4euJ1" target="_blank" rel="noopener">👑 VIPを開く</a>
+  <span id="status"></span>
+</header>
+
+<main>
+  <section class="card">
+    <div class="daterow">
+      <button id="prev">◀ 前日</button>
+      <div class="datebox">
+        <input type="date" id="date">
+        <span id="wday"></span>
+      </div>
+      <button id="next">翌日 ▶</button>
+      <button id="today">今日</button>
+    </div>
+    <h2>空き枠をさがす</h2>
+    <div class="finder">
+      <label class="field"><span>所要時間</span>
+        <select id="dur">
+          <option value="30">30分</option>
+          <option value="60" selected>60分</option>
+          <option value="90">90分</option>
+          <option value="120">120分</option>
+        </select>
+      </label>
+      <label class="field"><span>時間帯</span>
+        <span class="range"><select id="from"></select> 〜 <select id="to"></select></span>
+      </label>
+      <button class="primary" id="find">🔍 検索</button>
+    </div>
+
+    <details class="rooms" id="roomsPanel">
+      <summary>
+        <span class="arrow">▶</span>
+        対象の部屋
+        <span class="sel-count" id="selCount"></span>
+        <span style="font-size:11.5px;color:var(--sub)">クリックで選び直せます</span>
+      </summary>
+      <div id="roomGroups"></div>
+    </details>
+
+    <div class="results card" id="results" style="display:none; margin:16px 0 0;"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="gridTitle">タイムテーブル</h2>
+    <div class="grid-wrap" id="grid"></div>
+    <div class="note">
+      このサイトから<strong>りざぶ郎とGoogleカレンダーへの登録が同時に</strong>おこなえます📅<br>
+      ⚠ 予約の<strong>削除・変更</strong>は、このサイトからはできないので、<a href="https://www.r326.com/b/main.aspx?id=eplb0275" target="_blank" rel="noopener">りざぶ郎</a>から直接おこなってください✖<br>
+      （VIP Roomは閲覧のみです）
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <h3 id="dlgTitle"></h3>
+  <p id="dlgSub"></p>
+  <div class="timeedit">
+    <span style="font-size:12px;color:var(--sub)">時間の調整（5分単位で自由に変更できます）</span><br>
+    <input type="time" id="dlgStart" step="300"> 〜 <input type="time" id="dlgEnd" step="300">
+    <div id="dlgWarn"></div>
+  </div>
+  <div class="dlgfields">
+    <label>件名（任意・Googleカレンダーのタイトルに使います）<br><input type="text" id="dlgCaption" placeholder="例：営業MTG"></label>
+  </div>
+  <div class="dlgchecks">
+    <label><input type="checkbox" id="ckRzb" checked> 🏢 りざぶ郎で予約する（入力済みの画面が開きます）</label>
+    <label><input type="checkbox" id="ckGcal" checked> 📅 Googleカレンダーにも登録する</label>
+  </div>
+  <div class="dlg-actions">
+    <button class="primary" id="dlgGo">開く</button>
+  </div>
+  <div class="note">りざぶ郎の画面が開いたら、内容を確認して<strong>「OK」ボタンで確定</strong>してください。</div>
+  <div class="dlg-actions" style="margin-top:10px"><button onclick="dlg.close()">閉じる</button></div>
+</dialog>
+
+<script>
+const BOARD_URL = 'https://www.r326.com/b/main.aspx?id=eplb0275';
+const RZB_BASE = 'https://www.r326.com/b';
+const BOARD_ID = 'eplb0275';
+const DAY_START = 8 * 60, DAY_END = 21 * 60, STEP = 15;
+const GROUPS = [
+  { name: '🚗 車・機材', test: n => /プロジェクター|カメラ|スイッチャー|ライト|スタンド|スクリーン|バックボード|ポインター|廃止|社用車/.test(n), default: false },
+  { name: '🏬 八幡ビル702', test: n => /八幡ビル/.test(n), default: true },
+  { name: '🗾 支社（大阪・福岡・札幌）', test: n => /大阪|福岡|札幌|北海道/.test(n), default: true },
+  { name: '🏢 本社', test: () => true, default: true },
+];
+const PALETTE = [
+  ['#dbeafe','#3b82f6','#1e40af'],['#dcfce7','#22c55e','#166534'],['#fef3c7','#f59e0b','#92400e'],
+  ['#fce7f3','#ec4899','#9d174d'],['#ede9fe','#8b5cf6','#5b21b6'],['#ffedd5','#fb923c','#9a3412'],
+  ['#cffafe','#06b6d4','#155e75'],['#fee2e2','#ef4444','#991b1b'],
+];
+function colorFor(key){let h=0;for(const c of key)h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length];}
+
+let boardData = null; // board.json 全体
+let selectedRooms = new Set(JSON.parse(localStorage.getItem('rooms') || 'null') || []);
+let roomsInitialized = localStorage.getItem('rooms') !== null;
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
+const hm = min => `${pad(Math.floor(min/60))}:${pad(min%60)}`;
+const toMin = s => Number(s.slice(8,10))*60 + Number(s.slice(10,12));
+const dateInputToYmd = () => $('date').value.replaceAll('-', '');
+const groupOf = name => GROUPS.find(g => g.test(name));
+const wdayOf = v => ['日','月','火','水','木','金','土'][new Date(v).getDay()];
+
+function initTimeSelects() {
+  for (const sel of [$('from'), $('to')]) for (let m = DAY_START; m <= DAY_END; m += 30) sel.add(new Option(hm(m), m));
+  $('from').value = 9*60; $('to').value = 19*60;
+}
+
+// 暗号化データ（board.enc.json）をパスワードで復号する
+async function decryptBoard(encObj, password) {
+  const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const enc = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: b(encObj.salt), iterations: 200000, hash: 'SHA-256' },
+    baseKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+  );
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(encObj.iv) }, key, b(encObj.data));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+let encCache = null;
+async function tryUnlock(password) {
+  if (!encCache) {
+    const res = await fetch('board.enc.json?t=' + Date.now());
+    if (!res.ok) throw new Error('データファイルが読み込めません');
+    encCache = await res.json();
+  }
+  boardData = await decryptBoard(encCache, password); // パスワードが違うとここで例外
+  localStorage.setItem('roompw', password);
+  $('lock').hidden = true;
+  if (!roomsInitialized) {
+    for (const r of boardData.rooms) if (r.active && groupOf(r.name).default) selectedRooms.add(r.id);
+    roomsInitialized = true;
+  }
+  setToday();
+  render();
+}
+
+async function init() {
+  const saved = localStorage.getItem('roompw');
+  if (saved) {
+    try { await tryUnlock(saved); return; } catch { localStorage.removeItem('roompw'); }
+  }
+  $('lock').hidden = false;
+  $('lockPw').focus();
+}
+
+$('lockGo').onclick = async () => {
+  const pw = $('lockPw').value;
+  if (!pw) return;
+  $('lockErr').textContent = '';
+  $('lockGo').disabled = true;
+  try {
+    await tryUnlock(pw);
+  } catch (e) {
+    $('lockErr').textContent = e.message.includes('読み込めません') ? e.message : 'パスワードが違います';
+  } finally {
+    $('lockGo').disabled = false;
+  }
+};
+$('lockPw').onkeydown = e => { if (e.key === 'Enter') $('lockGo').click(); };
+
+function availableDates() { return Object.keys(boardData.days).sort(); }
+function setToday() {
+  const ds = availableDates();
+  const d = new Date();
+  const key = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  const use = boardData.days[key] ? key : ds[0];
+  $('date').value = `${use.slice(0,4)}-${use.slice(4,6)}-${use.slice(6,8)}`;
+}
+
+function reservationsFor(ymd) { return boardData.days[ymd] || null; }
+
+function render() {
+  const ymd = dateInputToYmd();
+  updateWday();
+  const gen = new Date(boardData.generatedAt);
+  $('status').textContent = `データ更新: ${gen.toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}`;
+  if (!reservationsFor(ymd)) {
+    $('grid').innerHTML = `<div class="empty">この日付のデータはありません（${availableDates()[0].replace(/(\d{4})(\d{2})(\d{2})/,'$1/$2/$3')} 〜 ${availableDates().slice(-1)[0].replace(/(\d{4})(\d{2})(\d{2})/,'$1/$2/$3')} まで表示できます）。</div>`;
+    $('gridTitle').textContent = 'タイムテーブル';
+    $('results').style.display = 'none';
+    renderRooms();
+    return;
+  }
+  renderRooms(); renderGrid(); $('results').style.display = 'none';
+}
+
+function updateWday() {
+  const v = $('date').value;
+  $('wday').textContent = `${Number(v.slice(5,7))}/${Number(v.slice(8,10))}（${wdayOf(v)}）`;
+}
+function visibleRooms() { return boardData.rooms.filter(r => selectedRooms.has(r.id)); }
+function saveRooms() { localStorage.setItem('rooms', JSON.stringify([...selectedRooms])); }
+
+function renderRooms() {
+  $('selCount').textContent = `${selectedRooms.size}件`;
+  const box = $('roomGroups'); box.innerHTML = '';
+  for (const g of GROUPS) {
+    const rooms = boardData.rooms.filter(r => r.active && groupOf(r.name) === g);
+    if (!rooms.length) continue;
+    const allOn = rooms.every(r => selectedRooms.has(r.id));
+    const div = document.createElement('div'); div.className = 'group';
+    const head = document.createElement('div'); head.className = 'group-head';
+    head.innerHTML = `<h3>${g.name}</h3>`;
+    const btn = document.createElement('button'); btn.className = 'ghost';
+    btn.textContent = allOn ? 'すべて外す' : 'すべて選ぶ';
+    btn.onclick = () => { for (const r of rooms) allOn ? selectedRooms.delete(r.id) : selectedRooms.add(r.id); saveRooms(); renderRooms(); renderGrid(); };
+    head.appendChild(btn); div.appendChild(head);
+    const chips = document.createElement('div'); chips.className = 'chips';
+    for (const r of rooms) {
+      const c = document.createElement('span');
+      c.className = 'chip' + (selectedRooms.has(r.id) ? ' on' : '');
+      c.textContent = r.name;
+      c.onclick = () => { selectedRooms.has(r.id) ? selectedRooms.delete(r.id) : selectedRooms.add(r.id); saveRooms(); renderRooms(); renderGrid(); };
+      chips.appendChild(c);
+    }
+    div.appendChild(chips); box.appendChild(div);
+  }
+}
+
+function roomReservations(roomId) {
+  const list = reservationsFor(dateInputToYmd()) || [];
+  return list.filter(x => x.roomId === roomId)
+    .map(x => ({ ...x, s: Math.max(toMin(x.start), DAY_START), e: Math.min(toMin(x.end), DAY_END) }))
+    .filter(x => x.e > x.s).sort((a,b) => a.s - b.s);
+}
+
+function renderGrid() {
+  const d = $('date').value;
+  $('gridTitle').textContent = `タイムテーブル（${d.replaceAll('-','/')}）`;
+  let html = '<table class="sched"><tr><th></th>';
+  for (let m = DAY_START; m < DAY_END; m += STEP) html += m % 60 === 0 ? `<th class="time" colspan="4">${Math.floor(m/60)}時</th>` : '';
+  html += '</tr>';
+  for (const room of visibleRooms()) {
+    const resv = roomReservations(room.id);
+    html += `<tr><td class="room">${room.name}</td>`;
+    let m = DAY_START;
+    while (m < DAY_END) {
+      const r = resv.find(x => x.s <= m && m < x.e);
+      if (r) {
+        const span = Math.round((r.e - Math.max(r.s, m)) / STEP);
+        const label = [r.title, r.owner].filter(Boolean).join(' / ') || '予約あり';
+        const c = colorFor(r.owner || r.title || r.id);
+        html += `<td class="slot resv" colspan="${span}" title="${hm(r.s)}〜${hm(r.e)} ${label}"><div class="resv-label" style="background:${c[0]};border-left-color:${c[1]};color:${c[2]}">${label}</div></td>`;
+        m += span * STEP;
+      } else { html += `<td class="slot${m % 60 === 0 ? ' hourline' : ''}"></td>`; m += STEP; }
+    }
+    html += '</tr>';
+  }
+  $('grid').innerHTML = html + '</table>';
+}
+
+function findSlots() {
+  if (!reservationsFor(dateInputToYmd())) return;
+  const dur = Number($('dur').value), from = Number($('from').value), to = Number($('to').value);
+  const out = [];
+  for (const room of visibleRooms()) {
+    const resv = roomReservations(room.id);
+    const slots = []; let cur = from;
+    for (const r of [...resv, { s: to, e: to }]) {
+      const end = Math.min(r.s, to);
+      if (end - cur >= dur) slots.push([cur, end]);
+      cur = Math.max(cur, r.e);
+      if (cur >= to) break;
+    }
+    if (slots.length) out.push({ room, slots });
+  }
+  renderResults(out, dur);
+}
+
+function renderResults(out, dur) {
+  const box = $('results'); box.style.display = 'block';
+  if (!out.length) { box.innerHTML = '<div class="empty">条件に合う空き枠が見つかりませんでした。時間帯や部屋を変えてみてください。</div>'; return; }
+  box.innerHTML = '<h2>空いている枠（クリックで予約）</h2>';
+  for (const { room, slots } of out) {
+    const div = document.createElement('div'); div.className = 'room-block';
+    div.innerHTML = `<h3>${room.name}</h3>`;
+    const wrap = document.createElement('div'); wrap.className = 'slots';
+    for (const [s, e] of slots) {
+      const starts = new Set();
+      for (let t = s; t + dur <= e; t += 30) starts.add(t);
+      starts.add(e - dur);
+      for (const t of [...starts].sort((a,b)=>a-b)) {
+        const b = document.createElement('button'); b.className = 'slotbtn';
+        b.textContent = `${hm(t)}〜${hm(t + dur)}`;
+        b.onclick = () => openDialog(room, t, t + dur);
+        wrap.appendChild(b);
+      }
+    }
+    div.appendChild(wrap); box.appendChild(div);
+  }
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+let dlgRoom = null;
+function openDialog(room, s, e) {
+  dlgRoom = room;
+  $('dlgTitle').textContent = room.name;
+  $('dlgSub').textContent = $('date').value.replaceAll('-','/') + `（${wdayOf($('date').value)}）`;
+  $('dlgStart').value = hm(s); $('dlgEnd').value = hm(e);
+  $('dlgCaption').value = '';
+  validateDlg();
+  $('dlg').showModal();
+}
+function validateDlg() {
+  const sv = $('dlgStart').value, ev = $('dlgEnd').value;
+  if (!sv || !ev || sv >= ev) { $('dlgWarn').textContent = '終了時刻は開始時刻より後にしてください'; return false; }
+  const sMin = Number(sv.slice(0,2))*60 + Number(sv.slice(3,5));
+  const eMin = Number(ev.slice(0,2))*60 + Number(ev.slice(3,5));
+  const overlap = roomReservations(dlgRoom.id).find(x => x.s < eMin && sMin < x.e);
+  $('dlgWarn').textContent = overlap ? `⚠ ${hm(overlap.s)}〜${hm(overlap.e)}の既存予約と重なっています` : '';
+  return !overlap;
+}
+$('dlgStart').oninput = validateDlg;
+$('dlgEnd').oninput = validateDlg;
+
+function rzbDeepLink() {
+  const d = dateInputToYmd();
+  const t1 = $('dlgStart').value.replace(':',''), t2 = $('dlgEnd').value.replace(':','');
+  return `${RZB_BASE}/schedule.aspx?id=${BOARD_ID}&itemid=${dlgRoom.id}&date=${d}&time1=${t1}&time2=${t2}`;
+}
+function gcalLink() {
+  const d = dateInputToYmd();
+  const sv = $('dlgStart').value, ev = $('dlgEnd').value;
+  const title = $('dlgCaption').value.trim() || 'MTG';
+  const g = new URL('https://calendar.google.com/calendar/render');
+  g.searchParams.set('action','TEMPLATE');
+  g.searchParams.set('text', `${title}（${dlgRoom.name}）`);
+  g.searchParams.set('dates', `${d}T${sv.replace(':','')}00/${d}T${ev.replace(':','')}00`);
+  g.searchParams.set('location', dlgRoom.name);
+  g.searchParams.set('ctz','Asia/Tokyo');
+  g.searchParams.set('details','部屋の予約状況: ' + BOARD_URL);
+  return g.toString();
+}
+
+$('dlgGo').onclick = () => {
+  if ($('dlgWarn').textContent.includes('終了時刻')) return;
+  const useRzb = $('ckRzb').checked, useGcal = $('ckGcal').checked;
+  if (!useRzb && !useGcal) { $('dlgWarn').textContent = '登録先を選んでください'; return; }
+  if (!validateDlg() && useRzb && !confirm('既存の予約と時間が重なっています。このままりざぶ郎の予約画面を開きますか？')) return;
+  if (useRzb) window.open(rzbDeepLink(), '_blank');
+  if (useGcal) window.open(gcalLink(), '_blank');
+  $('dlg').close();
+};
+
+$('prev').onclick = () => shiftDate(-1);
+$('next').onclick = () => shiftDate(1);
+$('today').onclick = () => { setToday(); render(); };
+$('date').onchange = render;
+$('find').onclick = findSlots;
+function shiftDate(days) {
+  const d = new Date($('date').value); d.setDate(d.getDate() + days);
+  $('date').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  render();
+}
+
+initTimeSelects();
+init();
+const dlg = $('dlg');
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+name: 会議室データ自動更新
+
+on:
+  schedule:
+    # JSTの平日日中を中心に15分おき（cronはUTC。UTC22-23,0-11 ≒ JST7:00-20:59）
+    - cron: '*/15 22,23,0,1,2,3,4,5,6,7,8,9,10,11 * * *'
+  workflow_dispatch:   # 手動実行も可能
+
+# 前の実行が動いていても最新だけを走らせる
+concurrency:
+  group: update-board
+  cancel-in-progress: true
+
+jobs:
+  update-board:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: りざぶ郎から予約データを取得（暗号化）
+        env:
+          DAYS: '21'
+          ROOM_PASSWORD: ${{ secrets.ROOM_PASSWORD }}
+        run: node scripts/fetch-board.mjs
+
+      - name: board.enc.json をコミット & プッシュ
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add board.enc.json
+          git diff --cached --quiet || git commit -m "auto update board data"
+          git push

@@ -1,0 +1,7 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# 平文の予約データは絶対にコミットしない（暗号化済みの board.enc.json のみ公開する）
+board.json
