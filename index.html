@@ -104,7 +104,8 @@
     <h2>🏢 会議室 空き状況ファインダー</h2>
     <p>共有パスワードを入力してください</p>
     <input type="password" id="lockPw" placeholder="パスワード" autocomplete="current-password">
-    <button class="primary" id="lockGo">開く</button>
+    <label style="display:block;text-align:left;font-size:12px;color:var(--sub);margin:6px 2px 0"><input type="checkbox" id="lockShow" style="vertical-align:middle;margin-right:4px">パスワードを表示する</label>
+    <button class="primary" id="lockGo" style="margin-top:10px">開く</button>
     <div id="lockErr"></div>
     <div id="buildTag" style="font-size:11px;color:#98a2b3;margin-top:14px"></div>
   </div>
@@ -323,9 +324,10 @@ async function doUnlock() {
 }
 $('lockGo').addEventListener('click', doUnlock);
 $('lockPw').addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
+$('lockShow').addEventListener('change', e => { $('lockPw').type = e.target.checked ? 'text' : 'password'; });
 // ビルド確認用（キャッシュ判別）
 $('lockErr').textContent = '';
-window.__BUILD = '20260715e';
+window.__BUILD = '20260715f';
 $('buildTag').textContent = 'バージョン ' + window.__BUILD + '（データ読込: ' + (window.__ENC ? 'OK' : (window.__ENC_ERR ? '失敗' : '待機中') ) + '）';
 
 function availableDates() { return Object.keys(boardData.days).sort(); }
