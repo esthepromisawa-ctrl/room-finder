@@ -61,6 +61,9 @@
   table.sched td.room { background: var(--card); font-size: 12px; font-weight: 600; padding: 6px 8px; white-space: nowrap; position: sticky; left: 0; z-index: 5; border-right: 2px solid var(--line); }
   table.sched td.slot { height: 34px; padding: 0; background: #fff; min-width: 11px; }
   table.sched td.slot.hourline { border-left: 1px solid #cfd4dc; }
+  /* 列幅を全時間スロットで均等固定するためのスペーサー行（見えない） */
+  table.sched tr.spacer td { padding: 0; border: 0; height: 0; line-height: 0; font-size: 0; }
+  table.sched tr.spacer td.slotcol { min-width: 11px; width: 11px; }
   .resv { position: relative; }
   .resv-label { position: absolute; inset: 2px; overflow: hidden; font-size: 10.5px; line-height: 1.25; border-radius: 4px; padding: 2px 4px; border-left: 3px solid; font-weight: 600; }
 
@@ -224,7 +227,7 @@ function initTimeSelects() {
   $('from').value = 9*60; $('to').value = 19*60;
 }
 
-window.__BUILD = '20260716f';
+window.__BUILD = '20260716g';
 
 // データ（board.js が読み込んだ window.__BOARD）を使って起動する。暗号もパスワードも不要。
 async function init() {
@@ -327,6 +330,10 @@ function renderGrid() {
   $('gridTitle').textContent = `タイムテーブル（${d.replaceAll('-','/')}）`;
   let html = '<table class="sched"><tr><th></th>';
   for (let m = DAY_START; m < DAY_END; m += STEP) html += m % 60 === 0 ? `<th class="time" colspan="4">${Math.floor(m/60)}時</th>` : '';
+  html += '</tr>';
+  // スペーサー行：全時間スロットを1セルずつ定義し、colspanをまたぐ予約でも列がズレないよう固定
+  html += '<tr class="spacer"><td></td>';
+  for (let m = DAY_START; m < DAY_END; m += STEP) html += '<td class="slotcol"></td>';
   html += '</tr>';
   for (const room of visibleRooms()) {
     const resv = roomReservations(room.id);
