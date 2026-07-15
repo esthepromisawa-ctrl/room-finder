@@ -97,19 +97,9 @@
 </style>
 </head>
 <body>
-<!-- 暗号化データはfetchではなくscriptタグで読み込む（社内プロキシ対策） -->
-<script src="board.enc.js" onerror="window.__ENC_ERR=true"></script>
-<div id="lock" hidden>
-  <div class="lockcard">
-    <h2>🏢 会議室 空き状況ファインダー</h2>
-    <p>共有パスワードを入力してください</p>
-    <input type="password" id="lockPw" placeholder="パスワード" autocomplete="current-password">
-    <label style="display:block;text-align:left;font-size:12px;color:var(--sub);margin:6px 2px 0"><input type="checkbox" id="lockShow" style="vertical-align:middle;margin-right:4px">パスワードを表示する</label>
-    <button class="primary" id="lockGo" style="margin-top:10px">開く</button>
-    <div id="lockErr"></div>
-    <div id="buildTag" style="font-size:11px;color:#98a2b3;margin-top:14px"></div>
-  </div>
-</div>
+<!-- データはscriptタグで読み込む（社内プロキシがfetchを止める環境でも通るため）。
+     暗号は使わず、予約者名・件名を含まない「空き/予約あり」だけのデータ。 -->
+<script src="board.js" onerror="window.__BOARD_ERR=true"></script>
 <header>
   <h1>🏢 会議室 空き状況ファインダー</h1>
   <a class="rzb-open" id="btnRzb" href="#" target="_blank" rel="noopener" hidden>🔗 りざぶ郎を開く</a>
@@ -225,65 +215,21 @@ function initTimeSelects() {
   $('from').value = 9*60; $('to').value = 19*60;
 }
 
-// 暗号化データ（board.enc.json）をパスワードで復号する
-async function decryptBoard(encObj, password) {
-  const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-  const enc = new TextEncoder();
-  const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
-  const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: b(encObj.salt), iterations: 1000, hash: 'SHA-256' },
-    baseKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
-  );
-  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(encObj.iv) }, key, b(encObj.data));
-  return JSON.parse(new TextDecoder().decode(pt));
-}
+window.__BUILD = '20260716a';
 
-let encCache = null;
-async function tryUnlock(password) {
-  // ブラウザが暗号解除（WebCrypto）に対応しているか先に確認する
-  if (!window.crypto || !window.crypto.subtle) {
-    const err = new Error('このブラウザは暗号解除に対応していません（ブラウザが古い可能性）。Chrome か Edge の最新版でお試しください。');
-    err.kind = 'nocrypto';
-    throw err;
+// データ（board.js が読み込んだ window.__BOARD）を使って起動する。暗号もパスワードも不要。
+async function init() {
+  // scriptタグの読み込み待ち（最大12秒）
+  for (let i = 0; i < 60 && !window.__BOARD && !window.__BOARD_ERR; i++) {
+    await new Promise(r => setTimeout(r, 200));
   }
-  if (!encCache) {
-    // board.enc.js（scriptタグ）が読み込んだ window.__ENC を使う。
-    // まだ読み込み中なら最大12秒待つ。
-    for (let i = 0; i < 60 && !window.__ENC && !window.__ENC_ERR; i++) {
-      await new Promise(r => setTimeout(r, 200));
-    }
-    if (window.__ENC_ERR || !window.__ENC) {
-      const err = new Error('データを読み込めませんでした（社内ネットワークでブロックされている可能性）。');
-      err.kind = 'fetch';
-      throw err;
-    }
-    encCache = window.__ENC;
+  if (window.__BOARD_ERR || !window.__BOARD) {
+    $('status').textContent = 'データを読み込めませんでした。時間をおいて再読み込みしてください。';
+    return;
   }
-  // 暗号解除（この処理がこの環境で固まっていないかを切り分ける）
-  $('lockErr').style.color = 'var(--sub)';
-  $('lockErr').textContent = '暗号を解いています…';
-  let decrypted;
-  try {
-    decrypted = await Promise.race([
-      decryptBoard(encCache, password),
-      new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { kind: 'cryptotimeout' })), 8000)),
-    ]);
-  } catch (e) {
-    if (e.kind === 'cryptotimeout') {
-      const err = new Error('暗号解除がこの環境で完了しませんでした（ブラウザのセキュリティ設定の可能性）。ブラウザ情報: ' + navigator.userAgent);
-      err.kind = 'cryptotimeout';
-      throw err;
-    }
-    const err = new Error('パスワードが違います');
-    err.kind = 'pw';
-    throw err;
-  }
-  boardData = decrypted;
-  localStorage.setItem('roompw', password);
-  $('lock').hidden = true;
-  // りざぶ郎への導線は復号後にだけ現れる
-  $('btnRzb').href = boardUrl();
-  $('btnRzb').hidden = false;
+  boardData = window.__BOARD;
+  // りざぶ郎への導線
+  $('btnRzb').href = boardUrl(); $('btnRzb').hidden = false;
   $('noteRzb').href = boardUrl();
   if (boardData.vipUrl) { $('btnVip').href = boardData.vipUrl; $('btnVip').hidden = false; }
   if (!roomsInitialized) {
@@ -293,42 +239,6 @@ async function tryUnlock(password) {
   setToday();
   render();
 }
-
-async function init() {
-  const saved = localStorage.getItem('roompw');
-  if (saved) {
-    try { await tryUnlock(saved); return; } catch { localStorage.removeItem('roompw'); }
-  }
-  $('lock').hidden = false;
-  $('lockPw').focus();
-}
-
-async function doUnlock() {
-  const pw = $('lockPw').value;
-  if (!pw) { $('lockErr').textContent = 'パスワードを入力してください'; return; }
-  // 押した瞬間の反応（クリックが効いているか一目で分かる）
-  $('lockErr').style.color = 'var(--sub)';
-  $('lockErr').textContent = '確認中…';
-  $('lockGo').disabled = true;
-  $('lockGo').textContent = '確認中…';
-  try {
-    await tryUnlock(pw);
-  } catch (e) {
-    console.error('[unlock]', e);
-    $('lockErr').style.color = '#b91c1c';
-    $('lockErr').textContent = e.message;
-  } finally {
-    $('lockGo').disabled = false;
-    $('lockGo').textContent = '開く';
-  }
-}
-$('lockGo').addEventListener('click', doUnlock);
-$('lockPw').addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
-$('lockShow').addEventListener('change', e => { $('lockPw').type = e.target.checked ? 'text' : 'password'; });
-// ビルド確認用（キャッシュ判別）
-$('lockErr').textContent = '';
-window.__BUILD = '20260715g';
-$('buildTag').textContent = 'バージョン ' + window.__BUILD + '（データ読込: ' + (window.__ENC ? 'OK' : (window.__ENC_ERR ? '失敗' : '待機中') ) + '）';
 
 function availableDates() { return Object.keys(boardData.days).sort(); }
 function setToday() {
@@ -410,9 +320,9 @@ function renderGrid() {
       const r = resv.find(x => x.s <= m && m < x.e);
       if (r) {
         const span = Math.round((r.e - Math.max(r.s, m)) / STEP);
-        const label = [r.title, r.owner].filter(Boolean).join(' / ') || '予約あり';
-        const c = colorFor(r.owner || r.title || r.id);
-        html += `<td class="slot resv" colspan="${span}" title="${hm(r.s)}〜${hm(r.e)} ${label}"><div class="resv-label" style="background:${c[0]};border-left-color:${c[1]};color:${c[2]}">${label}</div></td>`;
+        // 予約者名・件名は公開データに含めないため「予約あり」と時間のみ表示
+        const c = colorFor(room.id + r.start);
+        html += `<td class="slot resv" colspan="${span}" title="${hm(r.s)}〜${hm(r.e)} 予約あり"><div class="resv-label" style="background:${c[0]};border-left-color:${c[1]};color:${c[2]}">予約あり</div></td>`;
         m += span * STEP;
       } else { html += `<td class="slot${m % 60 === 0 ? ' hourline' : ''}"></td>`; m += STEP; }
     }

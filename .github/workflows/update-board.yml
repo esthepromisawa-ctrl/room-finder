@@ -24,18 +24,17 @@ jobs:
         with:
           node-version: '20'
 
-      - name: りざぶ郎から予約データを取得（暗号化）
+      - name: りざぶ郎から予約データを取得
         env:
           DAYS: '21'
-          ROOM_PASSWORD: ${{ secrets.ROOM_PASSWORD }}
           BOARD_ID: ${{ secrets.BOARD_ID }}
           VIP_URL: ${{ secrets.VIP_URL }}
         run: node scripts/fetch-board.mjs
 
-      - name: board.enc.js をコミット & プッシュ
+      - name: board.js をコミット & プッシュ
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add board.enc.js
+          git add board.js
           git diff --cached --quiet || git commit -m "auto update board data"
           git push
