@@ -15,7 +15,9 @@ if (!PASSWORD || !BOARD_ID) {
   console.error('環境変数 ROOM_PASSWORD / BOARD_ID が未設定です');
   process.exit(1);
 }
-const OUT = fileURLToPath(new URL('../board.enc.json', import.meta.url));
+// 暗号化データは <script src> で読み込む形式（board.enc.js）で出力する。
+// 社内プロキシが fetch/XHR を止めても、通常のスクリプト読み込みなら通るため。
+const OUT = fileURLToPath(new URL('../board.enc.js', import.meta.url));
 
 // パスワードから鍵を導出して AES-GCM で暗号化する（ブラウザ側のWebCryptoと同じ方式）
 async function encrypt(plaintext, password) {
@@ -54,5 +56,5 @@ for (let i = 0; i < DAYS; i++) {
 
 const board = { boardId: BOARD_ID, vipUrl: VIP_URL, generatedAt: new Date().toISOString(), rooms, days };
 const encrypted = await encrypt(JSON.stringify(board), PASSWORD);
-await writeFile(OUT, JSON.stringify(encrypted));
-console.log(`board.enc.json を生成しました（${DAYS}日分・部屋${rooms.length}・暗号化済み）`);
+await writeFile(OUT, 'window.__ENC=' + JSON.stringify(encrypted) + ';');
+console.log(`board.enc.js を生成しました（${DAYS}日分・部屋${rooms.length}・暗号化済み）`);

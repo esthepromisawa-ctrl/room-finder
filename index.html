@@ -97,6 +97,8 @@
 </style>
 </head>
 <body>
+<!-- 暗号化データはfetchではなくscriptタグで読み込む（社内プロキシ対策） -->
+<script src="board.enc.js" onerror="window.__ENC_ERR=true"></script>
 <div id="lock" hidden>
   <div class="lockcard">
     <h2>🏢 会議室 空き状況ファインダー</h2>
@@ -243,31 +245,17 @@ async function tryUnlock(password) {
     throw err;
   }
   if (!encCache) {
-    let res;
-    try {
-      // 社内ネットで固まる場合に備え、15秒でタイムアウトさせる
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 15000);
-      res = await fetch('board.enc.json?t=' + Date.now(), { signal: ctl.signal });
-      clearTimeout(timer);
-    } catch (e) {
-      const reason = e.name === 'AbortError' ? '通信が15秒応答なし（社内ネットワークが github.io を止めている可能性）' : e.message;
-      const err = new Error('データを取得できません：' + reason);
+    // board.enc.js（scriptタグ）が読み込んだ window.__ENC を使う。
+    // まだ読み込み中なら最大12秒待つ。
+    for (let i = 0; i < 60 && !window.__ENC && !window.__ENC_ERR; i++) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (window.__ENC_ERR || !window.__ENC) {
+      const err = new Error('データを読み込めませんでした（社内ネットワークでブロックされている可能性）。');
       err.kind = 'fetch';
       throw err;
     }
-    if (!res.ok) {
-      const err = new Error(`データを取得できません（HTTP ${res.status}）。社内ネットワークのブロックの可能性があります。`);
-      err.kind = 'fetch';
-      throw err;
-    }
-    try {
-      encCache = await res.json();
-    } catch (e) {
-      const err = new Error('データが壊れています（社内プロキシが内容を書き換えている可能性）。');
-      err.kind = 'parse';
-      throw err;
-    }
+    encCache = window.__ENC;
   }
   try {
     boardData = await decryptBoard(encCache, password);
@@ -323,7 +311,7 @@ $('lockGo').addEventListener('click', doUnlock);
 $('lockPw').addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
 // ビルド確認用（キャッシュ判別）
 $('lockErr').textContent = '';
-window.__BUILD = '20260715b';
+window.__BUILD = '20260715c';
 
 function availableDates() { return Object.keys(boardData.days).sort(); }
 function setToday() {
