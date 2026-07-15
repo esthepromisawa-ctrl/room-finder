@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 検索エンジンに載せない（noindex）。予約者名・件名を含むため検索結果に出さない -->
+<meta name="robots" content="noindex, nofollow, noarchive">
 <title>会議室 空き状況ファインダー</title>
 <style>
   :root {
@@ -215,7 +217,7 @@ function initTimeSelects() {
   $('from').value = 9*60; $('to').value = 19*60;
 }
 
-window.__BUILD = '20260716a';
+window.__BUILD = '20260716b';
 
 // データ（board.js が読み込んだ window.__BOARD）を使って起動する。暗号もパスワードも不要。
 async function init() {
@@ -320,9 +322,9 @@ function renderGrid() {
       const r = resv.find(x => x.s <= m && m < x.e);
       if (r) {
         const span = Math.round((r.e - Math.max(r.s, m)) / STEP);
-        // 予約者名・件名は公開データに含めないため「予約あり」と時間のみ表示
-        const c = colorFor(room.id + r.start);
-        html += `<td class="slot resv" colspan="${span}" title="${hm(r.s)}〜${hm(r.e)} 予約あり"><div class="resv-label" style="background:${c[0]};border-left-color:${c[1]};color:${c[2]}">予約あり</div></td>`;
+        const label = [r.title, r.owner].filter(Boolean).join(' / ') || '予約あり';
+        const c = colorFor(r.owner || r.title || (room.id + r.start));
+        html += `<td class="slot resv" colspan="${span}" title="${hm(r.s)}〜${hm(r.e)} ${label}"><div class="resv-label" style="background:${c[0]};border-left-color:${c[1]};color:${c[2]}">${label}</div></td>`;
         m += span * STEP;
       } else { html += `<td class="slot${m % 60 === 0 ? ' hourline' : ''}"></td>`; m += STEP; }
     }
