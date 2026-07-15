@@ -245,9 +245,14 @@ async function tryUnlock(password) {
   if (!encCache) {
     let res;
     try {
-      res = await fetch('board.enc.json?t=' + Date.now());
+      // 社内ネットで固まる場合に備え、15秒でタイムアウトさせる
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 15000);
+      res = await fetch('board.enc.json?t=' + Date.now(), { signal: ctl.signal });
+      clearTimeout(timer);
     } catch (e) {
-      const err = new Error('データを取得できません（社内ネットワークで通信がブロックされている可能性）: ' + e.message);
+      const reason = e.name === 'AbortError' ? '通信が15秒応答なし（社内ネットワークが github.io を止めている可能性）' : e.message;
+      const err = new Error('データを取得できません：' + reason);
       err.kind = 'fetch';
       throw err;
     }
@@ -295,21 +300,30 @@ async function init() {
   $('lockPw').focus();
 }
 
-$('lockGo').onclick = async () => {
+async function doUnlock() {
   const pw = $('lockPw').value;
-  if (!pw) return;
-  $('lockErr').textContent = '';
+  if (!pw) { $('lockErr').textContent = 'パスワードを入力してください'; return; }
+  // 押した瞬間の反応（クリックが効いているか一目で分かる）
+  $('lockErr').style.color = 'var(--sub)';
+  $('lockErr').textContent = '確認中…';
   $('lockGo').disabled = true;
+  $('lockGo').textContent = '確認中…';
   try {
     await tryUnlock(pw);
   } catch (e) {
     console.error('[unlock]', e);
+    $('lockErr').style.color = '#b91c1c';
     $('lockErr').textContent = e.message;
   } finally {
     $('lockGo').disabled = false;
+    $('lockGo').textContent = '開く';
   }
-};
-$('lockPw').onkeydown = e => { if (e.key === 'Enter') $('lockGo').click(); };
+}
+$('lockGo').addEventListener('click', doUnlock);
+$('lockPw').addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
+// ビルド確認用（キャッシュ判別）
+$('lockErr').textContent = '';
+window.__BUILD = '20260715b';
 
 function availableDates() { return Object.keys(boardData.days).sort(); }
 function setToday() {
