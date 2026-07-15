@@ -6,11 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { webcrypto as crypto } from 'node:crypto';
 import { RizaburoSession, parseItems, parseSchedules } from './rizaburo-read.mjs';
 
-const BOARD_ID = process.env.BOARD_ID || 'eplb0275';
+// 予約表のIDやVIP用URLは公開ソースに置かず、環境変数（GitHub Secrets）から渡す
+const BOARD_ID = process.env.BOARD_ID;
+const VIP_URL = process.env.VIP_URL || '';
 const DAYS = Number(process.env.DAYS || 21); // 取得する日数
 const PASSWORD = process.env.ROOM_PASSWORD;
-if (!PASSWORD) {
-  console.error('環境変数 ROOM_PASSWORD が未設定です（暗号化パスワード）');
+if (!PASSWORD || !BOARD_ID) {
+  console.error('環境変数 ROOM_PASSWORD / BOARD_ID が未設定です');
   process.exit(1);
 }
 const OUT = fileURLToPath(new URL('../board.enc.json', import.meta.url));
@@ -50,7 +52,7 @@ for (let i = 0; i < DAYS; i++) {
   process.stdout.write(`  ${key}: ${days[key].length}件\n`);
 }
 
-const board = { boardId: BOARD_ID, generatedAt: new Date().toISOString(), rooms, days };
+const board = { boardId: BOARD_ID, vipUrl: VIP_URL, generatedAt: new Date().toISOString(), rooms, days };
 const encrypted = await encrypt(JSON.stringify(board), PASSWORD);
 await writeFile(OUT, JSON.stringify(encrypted));
 console.log(`board.enc.json を生成しました（${DAYS}日分・部屋${rooms.length}・暗号化済み）`);

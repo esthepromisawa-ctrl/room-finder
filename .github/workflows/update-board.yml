@@ -28,6 +28,8 @@ jobs:
         env:
           DAYS: '21'
           ROOM_PASSWORD: ${{ secrets.ROOM_PASSWORD }}
+          BOARD_ID: ${{ secrets.BOARD_ID }}
+          VIP_URL: ${{ secrets.VIP_URL }}
         run: node scripts/fetch-board.mjs
 
       - name: board.enc.json をコミット & プッシュ

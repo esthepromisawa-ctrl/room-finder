@@ -108,8 +108,8 @@
 </div>
 <header>
   <h1>🏢 会議室 空き状況ファインダー</h1>
-  <a class="rzb-open" href="https://www.r326.com/b/main.aspx?id=eplb0275" target="_blank" rel="noopener">🔗 りざぶ郎を開く</a>
-  <a class="rzb-open vip" href="https://www.r326.com/b/main.aspx?g=tMdf6LK014fXN4euJ1" target="_blank" rel="noopener">👑 VIPを開く</a>
+  <a class="rzb-open" id="btnRzb" href="#" target="_blank" rel="noopener" hidden>🔗 りざぶ郎を開く</a>
+  <a class="rzb-open vip" id="btnVip" href="#" target="_blank" rel="noopener" hidden>👑 VIPを開く</a>
   <span id="status"></span>
 </header>
 
@@ -158,7 +158,7 @@
     <div class="grid-wrap" id="grid"></div>
     <div class="note">
       このサイトから<strong>りざぶ郎とGoogleカレンダーへの登録が同時に</strong>おこなえます📅<br>
-      ⚠ 予約の<strong>削除・変更</strong>は、このサイトからはできないので、<a href="https://www.r326.com/b/main.aspx?id=eplb0275" target="_blank" rel="noopener">りざぶ郎</a>から直接おこなってください✖<br>
+      ⚠ 予約の<strong>削除・変更</strong>は、このサイトからはできないので、<a href="#" id="noteRzb" target="_blank" rel="noopener">りざぶ郎</a>から直接おこなってください✖<br>
       （VIP Roomは閲覧のみです）
     </div>
   </section>
@@ -187,9 +187,9 @@
 </dialog>
 
 <script>
-const BOARD_URL = 'https://www.r326.com/b/main.aspx?id=eplb0275';
+// りざぶ郎のURLは公開ソースに置かない。復号したデータ(boardData.boardId等)から組み立てる
 const RZB_BASE = 'https://www.r326.com/b';
-const BOARD_ID = 'eplb0275';
+const boardUrl = () => `${RZB_BASE}/main.aspx?id=${boardData.boardId}`;
 const DAY_START = 8 * 60, DAY_END = 21 * 60, STEP = 15;
 const GROUPS = [
   { name: '🚗 車・機材', test: n => /プロジェクター|カメラ|スイッチャー|ライト|スタンド|スクリーン|バックボード|ポインター|廃止|社用車/.test(n), default: false },
@@ -244,6 +244,11 @@ async function tryUnlock(password) {
   boardData = await decryptBoard(encCache, password); // パスワードが違うとここで例外
   localStorage.setItem('roompw', password);
   $('lock').hidden = true;
+  // りざぶ郎への導線は復号後にだけ現れる
+  $('btnRzb').href = boardUrl();
+  $('btnRzb').hidden = false;
+  $('noteRzb').href = boardUrl();
+  if (boardData.vipUrl) { $('btnVip').href = boardData.vipUrl; $('btnVip').hidden = false; }
   if (!roomsInitialized) {
     for (const r of boardData.rooms) if (r.active && groupOf(r.name).default) selectedRooms.add(r.id);
     roomsInitialized = true;
@@ -434,7 +439,7 @@ $('dlgEnd').oninput = validateDlg;
 function rzbDeepLink() {
   const d = dateInputToYmd();
   const t1 = $('dlgStart').value.replace(':',''), t2 = $('dlgEnd').value.replace(':','');
-  return `${RZB_BASE}/schedule.aspx?id=${BOARD_ID}&itemid=${dlgRoom.id}&date=${d}&time1=${t1}&time2=${t2}`;
+  return `${RZB_BASE}/schedule.aspx?id=${boardData.boardId}&itemid=${dlgRoom.id}&date=${d}&time1=${t1}&time2=${t2}`;
 }
 function gcalLink() {
   const d = dateInputToYmd();
@@ -446,7 +451,7 @@ function gcalLink() {
   g.searchParams.set('dates', `${d}T${sv.replace(':','')}00/${d}T${ev.replace(':','')}00`);
   g.searchParams.set('location', dlgRoom.name);
   g.searchParams.set('ctz','Asia/Tokyo');
-  g.searchParams.set('details','部屋の予約状況: ' + BOARD_URL);
+  g.searchParams.set('details','部屋の予約状況: ' + boardUrl());
   return g.toString();
 }
 
