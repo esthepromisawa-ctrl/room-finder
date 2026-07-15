@@ -236,12 +236,41 @@ async function decryptBoard(encObj, password) {
 
 let encCache = null;
 async function tryUnlock(password) {
-  if (!encCache) {
-    const res = await fetch('board.enc.json?t=' + Date.now());
-    if (!res.ok) throw new Error('データファイルが読み込めません');
-    encCache = await res.json();
+  // ブラウザが暗号解除（WebCrypto）に対応しているか先に確認する
+  if (!window.crypto || !window.crypto.subtle) {
+    const err = new Error('このブラウザは暗号解除に対応していません（ブラウザが古い可能性）。Chrome か Edge の最新版でお試しください。');
+    err.kind = 'nocrypto';
+    throw err;
   }
-  boardData = await decryptBoard(encCache, password); // パスワードが違うとここで例外
+  if (!encCache) {
+    let res;
+    try {
+      res = await fetch('board.enc.json?t=' + Date.now());
+    } catch (e) {
+      const err = new Error('データを取得できません（社内ネットワークで通信がブロックされている可能性）: ' + e.message);
+      err.kind = 'fetch';
+      throw err;
+    }
+    if (!res.ok) {
+      const err = new Error(`データを取得できません（HTTP ${res.status}）。社内ネットワークのブロックの可能性があります。`);
+      err.kind = 'fetch';
+      throw err;
+    }
+    try {
+      encCache = await res.json();
+    } catch (e) {
+      const err = new Error('データが壊れています（社内プロキシが内容を書き換えている可能性）。');
+      err.kind = 'parse';
+      throw err;
+    }
+  }
+  try {
+    boardData = await decryptBoard(encCache, password);
+  } catch (e) {
+    const err = new Error('パスワードが違います');
+    err.kind = 'pw';
+    throw err;
+  }
   localStorage.setItem('roompw', password);
   $('lock').hidden = true;
   // りざぶ郎への導線は復号後にだけ現れる
@@ -274,7 +303,8 @@ $('lockGo').onclick = async () => {
   try {
     await tryUnlock(pw);
   } catch (e) {
-    $('lockErr').textContent = e.message.includes('読み込めません') ? e.message : 'パスワードが違います';
+    console.error('[unlock]', e);
+    $('lockErr').textContent = e.message;
   } finally {
     $('lockGo').disabled = false;
   }
