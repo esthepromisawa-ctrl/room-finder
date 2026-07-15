@@ -25,8 +25,9 @@ async function encrypt(plaintext, password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  // 反復回数は控えめ（社内PCが暗号を専用機能でなくJSで処理する環境でも固まらないように）
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 1000, hash: 'SHA-256' },
     baseKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
   );
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));

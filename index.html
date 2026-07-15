@@ -231,7 +231,7 @@ async function decryptBoard(encObj, password) {
   const enc = new TextEncoder();
   const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: b(encObj.salt), iterations: 200000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: b(encObj.salt), iterations: 1000, hash: 'SHA-256' },
     baseKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
   );
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(encObj.iv) }, key, b(encObj.data));
@@ -327,7 +327,7 @@ $('lockPw').addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock()
 $('lockShow').addEventListener('change', e => { $('lockPw').type = e.target.checked ? 'text' : 'password'; });
 // ビルド確認用（キャッシュ判別）
 $('lockErr').textContent = '';
-window.__BUILD = '20260715f';
+window.__BUILD = '20260715g';
 $('buildTag').textContent = 'バージョン ' + window.__BUILD + '（データ読込: ' + (window.__ENC ? 'OK' : (window.__ENC_ERR ? '失敗' : '待機中') ) + '）';
 
 function availableDates() { return Object.keys(boardData.days).sort(); }
