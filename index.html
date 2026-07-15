@@ -177,15 +177,12 @@
   <div class="dlgfields">
     <label>件名（任意）<br><input type="text" id="dlgCaption" placeholder="例：営業MTG"></label>
   </div>
-  <div class="dlgchecks">
-    <label><input type="checkbox" id="ckRzb" checked> 🏢 りざぶ郎で予約する</label>
-    <label><input type="checkbox" id="ckGcal" checked> 📅 Googleカレンダーにも登録する</label>
-  </div>
   <div class="dlg-actions">
-    <button class="primary" id="dlgGo">✔ この内容で開く</button>
+    <a class="a-rzb" id="dlgRzb" target="_blank" rel="noopener">🏢 りざぶ郎で予約する</a>
+    <a class="a-gcal" id="dlgGcal" target="_blank" rel="noopener">📅 Googleカレンダーに登録する</a>
   </div>
-  <div id="dlgFallback" style="display:none;margin-top:10px"></div>
   <div class="note">
+    使いたいボタンを押してください（この画面は開いたまま残るので、両方押せます）。<br>
     ・りざぶ郎：入力済みの画面が開くので<strong>「OK」で確定</strong>してください。<br>
     ・Googleカレンダー：予定作成画面が開くので<strong>「保存」を押す</strong>と登録されます（自動では入りません）。
   </div>
@@ -227,7 +224,7 @@ function initTimeSelects() {
   $('from').value = 9*60; $('to').value = 19*60;
 }
 
-window.__BUILD = '20260716d';
+window.__BUILD = '20260716e';
 
 // データ（board.js が読み込んだ window.__BOARD）を使って起動する。暗号もパスワードも不要。
 async function init() {
@@ -392,22 +389,28 @@ function openDialog(room, s, e) {
   $('dlgSub').textContent = $('date').value.replaceAll('-','/') + `（${wdayOf($('date').value)}）`;
   $('dlgStart').value = hm(s); $('dlgEnd').value = hm(e);
   $('dlgCaption').value = '';
-  $('dlgFallback').style.display = 'none';
   validateDlg();
   $('dlg').showModal();
 }
 function validateDlg() {
   const sv = $('dlgStart').value, ev = $('dlgEnd').value;
   const ok = sv && ev && sv < ev;
-  if (!ok) { $('dlgWarn').textContent = '終了時刻は開始時刻より後にしてください'; return false; }
-  const sMin = Number(sv.slice(0,2))*60 + Number(sv.slice(3,5));
-  const eMin = Number(ev.slice(0,2))*60 + Number(ev.slice(3,5));
-  const overlap = roomReservations(dlgRoom.id).find(x => x.s < eMin && sMin < x.e);
-  $('dlgWarn').textContent = overlap ? `⚠ ${hm(overlap.s)}〜${hm(overlap.e)}の既存予約と重なっています` : '';
-  return true;
+  if (!ok) { $('dlgWarn').textContent = '終了時刻は開始時刻より後にしてください'; }
+  else {
+    const sMin = Number(sv.slice(0,2))*60 + Number(sv.slice(3,5));
+    const eMin = Number(ev.slice(0,2))*60 + Number(ev.slice(3,5));
+    const overlap = roomReservations(dlgRoom.id).find(x => x.s < eMin && sMin < x.e);
+    $('dlgWarn').textContent = overlap ? `⚠ ${hm(overlap.s)}〜${hm(overlap.e)}の既存予約と重なっています` : '';
+  }
+  // 2つのボタンのリンクを最新の入力で更新（各ボタンは1タップで開くのでブロックされない）
+  $('dlgRzb').classList.toggle('disabled', !ok);
+  $('dlgGcal').classList.toggle('disabled', !ok);
+  if (ok) { $('dlgRzb').href = rzbDeepLink(); $('dlgGcal').href = gcalLink(); }
+  return ok;
 }
 $('dlgStart').oninput = validateDlg;
 $('dlgEnd').oninput = validateDlg;
+$('dlgCaption').oninput = validateDlg;
 
 function rzbDeepLink() {
   const d = dateInputToYmd();
@@ -427,27 +430,6 @@ function gcalLink() {
   g.searchParams.set('details','部屋の予約状況: ' + boardUrl());
   return g.toString();
 }
-
-// チェックした先を1クリックでまとめて開く
-$('dlgGo').onclick = () => {
-  if (!validateDlg()) return;
-  if ($('dlgWarn').textContent.includes('終了時刻')) return;
-  const useRzb = $('ckRzb').checked, useGcal = $('ckGcal').checked;
-  if (!useRzb && !useGcal) { $('dlgWarn').textContent = '登録先を選んでください'; return; }
-  const opened = [];
-  if (useRzb) opened.push(['りざぶ郎', rzbDeepLink(), window.open(rzbDeepLink(), '_blank')]);
-  if (useGcal) opened.push(['Googleカレンダー', gcalLink(), window.open(gcalLink(), '_blank')]);
-  // ポップアップがブロックされた場合は手動リンクを出す（保険）
-  const blocked = opened.filter(o => !o[2]);
-  if (blocked.length) {
-    const fb = $('dlgFallback');
-    fb.style.display = 'block';
-    fb.innerHTML = 'ポップアップがブロックされました。こちらを押してください：<br>' +
-      blocked.map(([name, url]) => `<a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">▶ ${name}を開く</a>`).join('<br>');
-  } else {
-    $('dlg').close();
-  }
-};
 
 $('prev').onclick = () => shiftDate(-1);
 $('next').onclick = () => shiftDate(1);
