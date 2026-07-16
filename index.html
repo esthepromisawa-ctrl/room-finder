@@ -57,13 +57,15 @@
   .grid-wrap { overflow-x: auto; }
   table.sched { border-collapse: collapse; min-width: 900px; width: 100%; }
   table.sched th, table.sched td { border: 1px solid var(--line); font-size: 11px; }
-  table.sched th.time { background: var(--card); color: var(--sub); font-weight: 500; padding: 3px 2px; min-width: 34px; }
-  table.sched td.room { background: var(--card); font-size: 12px; font-weight: 600; padding: 6px 8px; white-space: nowrap; position: sticky; left: 0; z-index: 5; border-right: 2px solid var(--line); }
-  table.sched td.slot { height: 34px; padding: 0; background: #fff; min-width: 11px; }
+  table.sched th.time { background: var(--card); color: var(--sub); font-weight: 500; padding: 3px 2px; }
+  /* 部屋名の列は内容ぴったりに固定（余白を吸わせない） */
+  table.sched th:first-child, table.sched td.room { width: 1%; white-space: nowrap; }
+  table.sched td.room { background: var(--card); font-size: 12px; font-weight: 600; padding: 6px 10px; position: sticky; left: 0; z-index: 5; border-right: 2px solid var(--line); }
+  table.sched td.slot { height: 34px; padding: 0; background: #fff; min-width: 18px; }
   table.sched td.slot.hourline { border-left: 1px solid #cfd4dc; }
   /* 列幅を全時間スロットで均等固定するためのスペーサー行（見えない） */
   table.sched tr.spacer td { padding: 0; border: 0; height: 0; line-height: 0; font-size: 0; }
-  table.sched tr.spacer td.slotcol { min-width: 11px; width: 11px; }
+  table.sched tr.spacer td.slotcol { min-width: 18px; }
   .resv { position: relative; }
   .resv-label { position: absolute; inset: 2px; overflow: hidden; font-size: 10.5px; line-height: 1.25; border-radius: 4px; padding: 2px 4px; border-left: 3px solid; font-weight: 600; }
 
@@ -227,7 +229,7 @@ function initTimeSelects() {
   $('from').value = 9*60; $('to').value = 19*60;
 }
 
-window.__BUILD = '20260716g';
+window.__BUILD = '20260716h';
 
 // データ（board.js が読み込んだ window.__BOARD）を使って起動する。暗号もパスワードも不要。
 async function init() {
