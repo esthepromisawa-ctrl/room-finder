@@ -195,7 +195,7 @@
 // りざぶ郎のURLは公開ソースに置かない。復号したデータ(boardData.boardId等)から組み立てる
 const RZB_BASE = 'https://www.r326.com/b';
 const boardUrl = () => `${RZB_BASE}/main.aspx?id=${boardData.boardId}`;
-const DAY_START = 8 * 60, DAY_END = 21 * 60, STEP = 15;
+const DAY_START = 9 * 60, DAY_END = 19 * 60, STEP = 15;
 const GROUPS = [
   { name: '🚗 車・機材', test: n => /プロジェクター|カメラ|スイッチャー|ライト|スタンド|スクリーン|バックボード|ポインター|廃止|社用車/.test(n), default: false },
   { name: '🏬 八幡ビル702', test: n => /八幡ビル/.test(n), default: true },
@@ -226,7 +226,7 @@ function initTimeSelects() {
   $('from').value = 9*60; $('to').value = 19*60;
 }
 
-window.__BUILD = '20260716i';
+window.__BUILD = '20260716j';
 
 // データ（board.js が読み込んだ window.__BOARD）を使って起動する。暗号もパスワードも不要。
 async function init() {
